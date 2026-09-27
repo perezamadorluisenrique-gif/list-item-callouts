@@ -1,0 +1,58 @@
+/* List Item Callouts. Each callout sets --lic-color to "r, g, b". */
+
+body {
+  --lic-bg-opacity: 0.12;
+  --lic-radius: var(--radius-s, 4px);
+}
+
+.theme-dark {
+  --lic-bg-opacity: 0.18;
+}
+
+/* Editor: the item's first line and any lines it wraps onto. */
+.markdown-source-view .cm-line.lic-callout {
+  background-color: rgba(var(--lic-color), var(--lic-bg-opacity));
+}
+
+.markdown-source-view .cm-line.lic-first {
+  border-top-left-radius: var(--lic-radius);
+  border-top-right-radius: var(--lic-radius);
+}
+
+.markdown-source-view .cm-line.lic-callout:not(:has(+ .cm-line.lic-continued)) {
+  border-bottom-left-radius: var(--lic-radius);
+  border-bottom-right-radius: var(--lic-radius);
+}
+
+/* Reading view: the whole item, nested items included. */
+li.lic-callout {
+  background-color: rgba(var(--lic-color), var(--lic-bg-opacity));
+  border-radius: var(--lic-radius);
+  padding-right: var(--size-4-2);
+}
+
+.lic-marker {
+  color: rgb(var(--lic-color));
+  font-family: var(--font-monospace);
+  font-weight: var(--font-bold, 700);
+}
+
+.lic-marker > svg {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+}
+
+.lic-suggestion {
+  display: flex;
+  gap: var(--size-4-2);
+  align-items: center;
+}
+
+.lic-setting-row input[type='text'] {
+  width: 6em;
+}
+
+.lic-invalid {
+  border-color: var(--text-error) !important;
+}
