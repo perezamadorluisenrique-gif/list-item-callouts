@@ -19,7 +19,7 @@ body {
   border-top-right-radius: var(--lic-radius);
 }
 
-.markdown-source-view .cm-line.lic-callout:not(:has(+ .cm-line.lic-continued)) {
+.markdown-source-view .cm-line.lic-last {
   border-bottom-left-radius: var(--lic-radius);
   border-bottom-right-radius: var(--lic-radius);
 }
@@ -53,6 +53,6 @@ li.lic-callout {
   width: 6em;
 }
 
-.lic-invalid {
-  border-color: var(--text-error) !important;
+.lic-setting-row input[type='text'].lic-invalid {
+  border-color: var(--text-error);
 }

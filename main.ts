@@ -8,6 +8,7 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
+  SettingDefinitionItem,
   editorLivePreviewField,
   getIcon,
   setIcon,
@@ -219,7 +220,20 @@ export default class ListItemCalloutsPlugin extends Plugin {
           const hit = calloutAt(line.text, settings.callouts);
           if (!hit || isCode(tree.resolveInner(line.from, 1).type.name)) continue;
 
-          const attrs = { class: 'lic-callout lic-first', style: `--lic-color: ${hit.callout.color}`, 'data-lic': hit.callout.char };
+          // How many lines the item wraps onto, so the last one can round
+          // its bottom corners (a class, not `:has()`, which is slow).
+          let extra = 0;
+          if (settings.colourContinuation) {
+            const lines: string[] = [];
+            for (let i = line.number + 1; i <= Math.min(doc.lines, line.number + 200); i++) lines.push(doc.line(i).text);
+            extra = continuationLines([line.text, ...lines], 0);
+          }
+
+          const attrs = {
+            class: extra === 0 ? 'lic-callout lic-first lic-last' : 'lic-callout lic-first',
+            style: `--lic-color: ${hit.callout.color}`,
+            'data-lic': hit.callout.char,
+          };
           builder.add(line.from, line.from, Decoration.line({ attributes: attrs }));
           const markFrom = line.from + hit.from;
           const markTo = line.from + hit.to;
@@ -231,16 +245,14 @@ export default class ListItemCalloutsPlugin extends Plugin {
               : Decoration.mark({ class: 'lic-marker' }),
           );
 
-          if (settings.colourContinuation) {
-            const lines: string[] = [];
-            for (let i = line.number + 1; i <= Math.min(doc.lines, line.number + 200); i++) lines.push(doc.line(i).text);
-            const extra = continuationLines([line.text, ...lines], 0);
+          if (extra > 0) {
             for (let i = 1; i <= extra; i++) {
               const next = doc.line(line.number + i);
+              const cls = i === extra ? 'lic-callout lic-continued lic-last' : 'lic-callout lic-continued';
               builder.add(
                 next.from,
                 next.from,
-                Decoration.line({ attributes: { class: 'lic-callout lic-continued', style: `--lic-color: ${hit.callout.color}` } }),
+                Decoration.line({ attributes: { class: cls, style: `--lic-color: ${hit.callout.color}` } }),
               );
             }
             colouredUpTo = line.number + extra;
@@ -302,16 +314,19 @@ class MarkerWidget extends WidgetType {
 /** The first piece of text in a rendered list item, past its checkbox. */
 function firstTextNode(li: HTMLElement): Text | null {
   for (const child of Array.from(li.childNodes)) {
-    if (child instanceof Text) {
-      if (child.nodeValue?.trim()) return child;
+    if (child.nodeType === Node.TEXT_NODE) {
+      if (child.nodeValue?.trim()) return child as Text;
       continue;
     }
-    if (!(child instanceof HTMLElement)) continue;
-    if (child.tagName === 'UL' || child.tagName === 'OL') return null;
-    if (child.tagName === 'INPUT' || child.hasClass('list-bullet') || child.hasClass('list-collapse-indicator')) continue;
-    if (child.tagName === 'P') {
-      const first = child.firstChild;
-      return first instanceof Text ? first : null;
+    // Node types rather than `instanceof`, which fails for nodes from a
+    // popped-out window.
+    if (child.nodeType !== Node.ELEMENT_NODE) continue;
+    const el = child as HTMLElement;
+    if (el.tagName === 'UL' || el.tagName === 'OL') return null;
+    if (el.tagName === 'INPUT' || el.hasClass('list-bullet') || el.hasClass('list-collapse-indicator')) continue;
+    if (el.tagName === 'P') {
+      const first = el.firstChild;
+      return first?.nodeType === Node.TEXT_NODE ? (first as Text) : null;
     }
     return null;
   }
@@ -353,7 +368,30 @@ class CalloutPicker extends FuzzySuggestModal<Callout> {
   }
 }
 
+/** Names and descriptions shared by both renderings of the settings tab. */
+const SETTING_TEXT = {
+  colourContinuation: {
+    name: 'Colour wrapped lines',
+    desc: 'Colour the lines an item wraps onto in the editor, not just its first line.',
+  },
+  syntax: {
+    name: 'Writing a callout',
+    desc: 'Start a list item with one of these characters and a space, as in "- & Buy milk". An icon, if set, is shown in place of the character; use any Lucide icon name, such as "star" or "alert-triangle".',
+  },
+  restore: {
+    name: 'Restore defaults',
+    desc: 'Replace your callouts with the seven built-in ones.',
+  },
+  legacy: {
+    name: 'Import from List Callouts',
+    desc: 'Copy the characters, colours and icons you set up in the List Callouts plugin, if it was ever installed in this vault.',
+  },
+};
+
 class ListItemCalloutsSettingTab extends PluginSettingTab {
+  /** Set once Obsidian has drawn the tab through `display()`, which it does only before 1.13. */
+  private legacy = false;
+
   constructor(
     app: App,
     private plugin: ListItemCalloutsPlugin,
@@ -361,115 +399,179 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
     super(app, plugin);
   }
 
+  /**
+   * The settings, described rather than drawn. Obsidian 1.13 and later
+   * renders this itself and indexes it, so the settings turn up in the
+   * settings search. Older versions ignore it and call `display()`.
+   */
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    const settings = this.plugin.settings;
+    return [
+      {
+        ...SETTING_TEXT.colourContinuation,
+        control: { type: 'toggle', key: 'colourContinuation', defaultValue: DEFAULT_SETTINGS.colourContinuation },
+      },
+      SETTING_TEXT.syntax,
+      {
+        type: 'list',
+        heading: 'Callouts',
+        emptyState: 'No callouts. Add one, or restore the defaults.',
+        items: settings.callouts.map((callout, index) => ({
+          name: `${callout.char} ${callout.name ?? ''}`.trim(),
+          aliases: callout.icon ? [callout.icon] : undefined,
+          render: (setting: Setting) => this.calloutRow(setting, callout, index),
+        })),
+        onDelete: (index: number) => {
+          settings.callouts.splice(index, 1);
+          this.saveAndRedraw();
+        },
+        onReorder: (from: number, to: number) => {
+          const [moved] = settings.callouts.splice(from, 1);
+          settings.callouts.splice(to, 0, moved);
+          this.saveAndRedraw();
+        },
+        addItem: { name: 'Add callout', action: () => this.addCallout() },
+      },
+      { ...SETTING_TEXT.restore, action: () => this.restoreDefaults() },
+      { ...SETTING_TEXT.legacy, action: () => void this.importLegacy() },
+    ];
+  }
+
+  /** Persists a change made through a declarative control, through the plugin's one path to disk. */
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    Object.assign(this.plugin.settings, { [key]: value });
+    await this.plugin.saveSettings();
+  }
+
+  /** The pre-1.13 rendering. Obsidian skips it once `getSettingDefinitions()` returns anything. */
   display(): void {
+    this.legacy = true;
+    this.draw();
+  }
+
+  private draw(): void {
     const { containerEl } = this;
     containerEl.empty();
     const settings = this.plugin.settings;
-    const save = () => void this.plugin.saveSettings();
 
     new Setting(containerEl)
-      .setName('Colour wrapped lines')
-      .setDesc('Colour the lines an item wraps onto in the editor, not just its first line.')
+      .setName(SETTING_TEXT.colourContinuation.name)
+      .setDesc(SETTING_TEXT.colourContinuation.desc)
       .addToggle((toggle) =>
         toggle.setValue(settings.colourContinuation).onChange((value) => {
           settings.colourContinuation = value;
-          save();
+          void this.plugin.saveSettings();
         }),
       );
 
     new Setting(containerEl).setName('Callouts').setHeading();
-    containerEl.createEl('p', {
-      cls: 'setting-item-description',
-      text: 'Start a list item with one of these characters and a space, as in "- & Buy milk". An icon, if set, is shown in place of the character; use any Lucide icon name, such as "star" or "alert-triangle".',
-    });
+    containerEl.createEl('p', { cls: 'setting-item-description', text: SETTING_TEXT.syntax.desc });
 
     settings.callouts.forEach((callout, index) => {
-      const row = new Setting(containerEl).setClass('lic-setting-row');
-      row.nameEl.createSpan({ cls: 'lic-marker', text: callout.char }).style.setProperty('--lic-color', callout.color);
-      row.nameEl.createSpan({ text: ` ${callout.name ?? ''}` });
-      row.addText((text) =>
-        text
-          .setPlaceholder('Char')
-          .setValue(callout.char)
-          .onChange((value) => {
-            const taken = settings.callouts.some((c, i) => i !== index && c.char === value);
-            text.inputEl.toggleClass('lic-invalid', !validChar(value) || taken);
-            if (!validChar(value) || taken) return;
-            callout.char = value;
-            save();
-          }),
-      );
-      row.addText((text) =>
-        text
-          .setPlaceholder('Name')
-          .setValue(callout.name ?? '')
-          .onChange((value) => {
-            callout.name = value.trim() || undefined;
-            save();
-          }),
-      );
-      row.addText((text) =>
-        text
-          .setPlaceholder('Icon')
-          .setValue(callout.icon ?? '')
-          .onChange((value) => {
-            const icon = value.trim();
-            text.inputEl.toggleClass('lic-invalid', icon !== '' && !getIcon(icon));
-            if (icon !== '' && !getIcon(icon)) return;
-            callout.icon = icon || undefined;
-            save();
-          }),
-      );
-      row.addColorPicker((picker) =>
-        picker.setValue(toHex(callout.color)).onChange((value) => {
-          const rgb = toRgb(value);
-          if (!rgb) return;
-          callout.color = rgb;
-          save();
-        }),
-      );
+      const row = new Setting(containerEl);
+      this.calloutRow(row, callout, index);
       row.addExtraButton((button) =>
-        button
-          .setIcon('trash-2')
-          .setTooltip('Remove')
-          .onClick(() => {
-            settings.callouts.splice(index, 1);
-            save();
-            this.display();
-          }),
+        button.setIcon('trash-2').onClick(() => {
+          settings.callouts.splice(index, 1);
+          this.saveAndRedraw();
+        }),
       );
     });
 
     new Setting(containerEl)
-      .addButton((button) =>
-        button
-          .setButtonText('Add callout')
-          .setCta()
-          .onClick(() => {
-            const used = new Set(settings.callouts.map((c) => c.char));
-            const char = ['*', '^', '+', '=', '#', '>', '<', '/'].map((c) => c + c).find((c) => !used.has(c) && validChar(c)) ?? '??';
-            settings.callouts.push({ char, color: '100, 100, 255', name: 'New' });
-            save();
-            this.display();
-          }),
-      )
-      .addButton((button) =>
-        button.setButtonText('Restore defaults').onClick(() => {
-          settings.callouts = DEFAULT_CALLOUTS.map((c) => ({ ...c }));
-          save();
-          this.display();
-        }),
-      );
+      .addButton((button) => button.setButtonText('Add callout').setCta().onClick(() => this.addCallout()))
+      .addButton((button) => button.setButtonText(SETTING_TEXT.restore.name).onClick(() => this.restoreDefaults()));
 
-    const legacy = new Setting(containerEl)
-      .setName('Import from List Callouts')
-      .setDesc('Copy the characters, colours and icons you set up in the List Callouts plugin, if it was ever installed in this vault.');
-    legacy.addButton((button) =>
-      button.setButtonText('Import').onClick(async () => {
-        const n = await this.plugin.importLegacy();
-        new Notice(n > 0 ? `Imported ${n} callouts from List Callouts.` : 'No List Callouts settings were found in this vault.');
-        this.display();
+    new Setting(containerEl)
+      .setName(SETTING_TEXT.legacy.name)
+      .setDesc(SETTING_TEXT.legacy.desc)
+      .addButton((button) => button.setButtonText('Import').onClick(() => void this.importLegacy()));
+  }
+
+  /** One callout's row: character, name, icon and colour. */
+  private calloutRow(row: Setting, callout: Callout, index: number): void {
+    const settings = this.plugin.settings;
+    const save = () => void this.plugin.saveSettings();
+    row.setClass('lic-setting-row');
+    row.nameEl.empty();
+    row.nameEl.createSpan({ cls: 'lic-marker', text: callout.char }).style.setProperty('--lic-color', callout.color);
+    row.nameEl.createSpan({ text: ` ${callout.name ?? ''}` });
+    row.addText((text) =>
+      text
+        .setPlaceholder('Char')
+        .setValue(callout.char)
+        .onChange((value) => {
+          const taken = settings.callouts.some((c, i) => i !== index && c.char === value);
+          text.inputEl.toggleClass('lic-invalid', !validChar(value) || taken);
+          if (!validChar(value) || taken) return;
+          callout.char = value;
+          save();
+        }),
+    );
+    row.addText((text) =>
+      text
+        .setPlaceholder('Name')
+        .setValue(callout.name ?? '')
+        .onChange((value) => {
+          callout.name = value.trim() || undefined;
+          save();
+        }),
+    );
+    row.addText((text) =>
+      text
+        .setPlaceholder('Icon')
+        .setValue(callout.icon ?? '')
+        .onChange((value) => {
+          const icon = value.trim();
+          text.inputEl.toggleClass('lic-invalid', icon !== '' && !getIcon(icon));
+          if (icon !== '' && !getIcon(icon)) return;
+          callout.icon = icon || undefined;
+          save();
+        }),
+    );
+    row.addColorPicker((picker) =>
+      picker.setValue(toHex(callout.color)).onChange((value) => {
+        const rgb = toRgb(value);
+        if (!rgb) return;
+        callout.color = rgb;
+        save();
       }),
     );
+  }
+
+  private addCallout(): void {
+    const settings = this.plugin.settings;
+    const used = new Set(settings.callouts.map((c) => c.char));
+    const char = ['*', '^', '+', '=', '#', '>', '<', '/'].map((c) => c + c).find((c) => !used.has(c) && validChar(c)) ?? '??';
+    settings.callouts.push({ char, color: '100, 100, 255', name: 'New' });
+    this.saveAndRedraw();
+  }
+
+  private restoreDefaults(): void {
+    this.plugin.settings.callouts = DEFAULT_CALLOUTS.map((c) => ({ ...c }));
+    this.saveAndRedraw();
+  }
+
+  private async importLegacy(): Promise<void> {
+    const n = await this.plugin.importLegacy();
+    new Notice(n > 0 ? `Imported ${n} callouts from List Callouts.` : 'No List Callouts settings were found in this vault.');
+    this.redraw();
+  }
+
+  private saveAndRedraw(): void {
+    void this.plugin.saveSettings();
+    this.redraw();
+  }
+
+  /** Draws the tab again after the list of callouts changed, whichever way it was drawn. */
+  private redraw(): void {
+    if (this.legacy) {
+      this.draw();
+      return;
+    }
+    // Obsidian 1.13's re-render of the declarative definitions. Looked up
+    // rather than called directly, because older versions do not have it.
+    const tab = this as unknown as { update?: () => void };
+    tab.update?.();
   }
 }
