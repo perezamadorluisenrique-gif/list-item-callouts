@@ -71,6 +71,20 @@ and properties are never coloured.
 Each works on every line of the selection, in one step of the undo history.
 None has a hotkey by default; assign them in **Settings → Hotkeys**.
 
+## Callout overview
+
+**Open the callout overview** shows every callout item in one place, in the
+right sidebar. Choose **This note** or **Whole vault**. Items are grouped by
+callout, with its colour, character or icon and a count, and each shows its
+text on one line (and, for the whole vault, the note it is in). Click an item
+to jump to its line. The buttons at the top of the list show or hide one
+callout at a time.
+
+The list follows the note you are in and updates as you type. Code blocks,
+maths and properties are left out, as everywhere else. The overview only
+reads your notes; it never changes them. Obsidian puts it back where you had
+it when you restart.
+
 ## Styling
 
 The background strength is a CSS variable, `--lic-bg-opacity` (0.12 in light

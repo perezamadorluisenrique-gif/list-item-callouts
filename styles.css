@@ -56,3 +56,77 @@ li.lic-callout {
 .lic-setting-row input[type='text'].lic-invalid {
   border-color: var(--text-error);
 }
+
+/* Overview sidebar. */
+.lic-overview {
+  padding: var(--size-4-2);
+}
+
+.lic-ov-scope,
+.lic-ov-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-1);
+  margin-bottom: var(--size-4-2);
+}
+
+.lic-ov-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-2);
+}
+
+.lic-ov-filter.is-off {
+  opacity: 0.45;
+}
+
+.lic-ov-empty {
+  color: var(--text-muted);
+  padding: var(--size-4-2);
+}
+
+.lic-ov-group {
+  margin-bottom: var(--size-4-3);
+}
+
+.lic-ov-head {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--size-2-2);
+}
+
+.lic-ov-count {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.lic-ov-filter .lic-ov-count {
+  margin-left: 0;
+}
+
+.lic-ov-item {
+  display: flex;
+  flex-direction: column;
+  padding: var(--size-2-2) var(--size-4-2);
+  border-radius: var(--lic-radius);
+  border-left: 3px solid rgb(var(--lic-color));
+  background-color: rgba(var(--lic-color), var(--lic-bg-opacity));
+  margin-bottom: var(--size-2-2);
+  cursor: pointer;
+}
+
+.lic-ov-item:hover {
+  background-color: rgba(var(--lic-color), calc(var(--lic-bg-opacity) * 2));
+}
+
+.lic-ov-text {
+  overflow-wrap: anywhere;
+}
+
+.lic-ov-note {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}

@@ -4,6 +4,10 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## Unreleased
+
+- New **Open the callout overview** command: a sidebar that lists every callout item in the current note or the whole vault, grouped by callout with counts, with a filter per callout and click to jump to the line.
+
 ## 0.1.1
 
 - Settings now show up in Obsidian's settings search (1.13 and later), with native add, delete and reorder for callouts. Fixes the directory review: the minimum Obsidian version is now 1.0.0, which the colour picker needs. Rounded corners no longer use the slow CSS :has() selector.

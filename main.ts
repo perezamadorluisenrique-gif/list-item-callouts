@@ -3,16 +3,20 @@ import {
   Editor,
   EditorChange,
   FuzzySuggestModal,
+  ItemView,
   MarkdownView,
   Notice,
   Plugin,
   PluginSettingTab,
   Setting,
   SettingDefinitionItem,
+  TFile,
+  debounce,
   editorLivePreviewField,
   getIcon,
   setIcon,
 } from 'obsidian';
+import type { ViewStateResult, WorkspaceLeaf } from 'obsidian';
 import { syntaxTree } from '@codemirror/language';
 import { RangeSetBuilder } from '@codemirror/state';
 import type { Extension } from '@codemirror/state';
@@ -32,6 +36,8 @@ import {
   validChar,
 } from './src/callouts.ts';
 import type { Callout } from './src/callouts.ts';
+import { extractCallouts, groupByCallout, plainText, truncate } from './src/overview.ts';
+import type { FoundCallout } from './src/overview.ts';
 
 interface ListItemCalloutsSettings {
   callouts: Callout[];
@@ -59,6 +65,13 @@ export default class ListItemCalloutsPlugin extends Plugin {
     this.registerEditorExtension(this.editorExtensions);
     this.registerMarkdownPostProcessor((el) => this.processReading(el));
     this.addSettingTab(new ListItemCalloutsSettingTab(this.app, this));
+    this.registerView(VIEW_TYPE, (leaf) => new CalloutsView(leaf, this));
+    this.addCommand({
+      id: 'open-overview',
+      name: 'Open the callout overview',
+      icon: 'list-checks',
+      callback: () => void this.openOverview(),
+    });
 
     this.addCommand({
       id: 'toggle-callout',
@@ -90,6 +103,26 @@ export default class ListItemCalloutsPlugin extends Plugin {
         new CalloutPicker(this.app, this.settings.callouts, (callout) => this.editLines(editor, () => callout.char)).open();
       },
     });
+  }
+
+  /** Shows the overview in the right sidebar, reusing it when it is already open. */
+  async openOverview(): Promise<void> {
+    const { workspace } = this.app;
+    let leaf: WorkspaceLeaf | null = workspace.getLeavesOfType(VIEW_TYPE)[0] ?? null;
+    if (!leaf) {
+      leaf = workspace.getRightLeaf(false);
+      if (!leaf) return;
+      await leaf.setViewState({ type: VIEW_TYPE, active: true });
+    }
+    workspace.rightSplit.expand();
+    workspace.setActiveLeaf(leaf, { focus: true });
+  }
+
+  /** Redraws the open overviews, after the callouts changed. */
+  refreshOverviews(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) {
+      if (leaf.view instanceof CalloutsView) leaf.view.invalidate();
+    }
   }
 
   /**
@@ -132,6 +165,7 @@ export default class ListItemCalloutsPlugin extends Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
     this.refresh();
+    this.refreshOverviews();
   }
 
   /** Redraws open notes with the current settings, in the editor and in Reading view. */
@@ -280,6 +314,224 @@ export default class ListItemCalloutsPlugin extends Plugin {
       },
       { decorations: (v) => v.decorations },
     );
+  }
+}
+
+const VIEW_TYPE = 'list-item-callouts-overview';
+/** Longest item text shown in the overview, in characters. */
+const SNIPPET_LENGTH = 140;
+
+type OverviewScope = 'note' | 'vault';
+
+interface OverviewItem extends FoundCallout {
+  file: TFile;
+}
+
+/** The sidebar listing every callout item of the note or the vault, by type. */
+class CalloutsView extends ItemView {
+  private mode: OverviewScope = 'note';
+  /** Characters shown; empty means all of them. */
+  private only = new Set<string>();
+  /** Per file: what was found, and the modification time it was found at. */
+  private cache = new Map<string, { mtime: number; found: FoundCallout[] }>();
+  private token = 0;
+  private readonly refreshSoon = debounce(() => void this.render(), 300, true);
+
+  constructor(
+    leaf: WorkspaceLeaf,
+    private plugin: ListItemCalloutsPlugin,
+  ) {
+    super(leaf);
+  }
+
+  getViewType(): string {
+    return VIEW_TYPE;
+  }
+
+  getDisplayText(): string {
+    return 'Callouts';
+  }
+
+  getIcon(): string {
+    return 'list-checks';
+  }
+
+  getState(): Record<string, unknown> {
+    return { ...super.getState(), scope: this.mode, only: [...this.only] };
+  }
+
+  async setState(state: unknown, result: ViewStateResult): Promise<void> {
+    const saved = (state ?? {}) as { scope?: unknown; only?: unknown };
+    this.mode = saved.scope === 'vault' ? 'vault' : 'note';
+    this.only = new Set(Array.isArray(saved.only) ? saved.only.filter((c): c is string => typeof c === 'string') : []);
+    await super.setState(state, result);
+    void this.render();
+  }
+
+  onOpen(): Promise<void> {
+    this.contentEl.addClass('lic-overview');
+    const { workspace, metadataCache, vault } = this.app;
+    this.registerEvent(workspace.on('active-leaf-change', () => this.refreshSoon()));
+    this.registerEvent(
+      metadataCache.on('changed', (file) => {
+        if (this.mode === 'vault' || file.path === workspace.getActiveFile()?.path) this.refreshSoon();
+      }),
+    );
+    this.registerEvent(
+      vault.on('delete', (file) => {
+        this.cache.delete(file.path);
+        this.refreshSoon();
+      }),
+    );
+    this.registerEvent(
+      vault.on('rename', (_file, oldPath) => {
+        this.cache.delete(oldPath);
+        this.refreshSoon();
+      }),
+    );
+    void this.render();
+    return Promise.resolve();
+  }
+
+  onClose(): Promise<void> {
+    this.token++;
+    this.cache.clear();
+    this.contentEl.empty();
+    return Promise.resolve();
+  }
+
+  /** Forget what was found (the callouts changed) and draw again. */
+  invalidate(): void {
+    this.cache.clear();
+    void this.render();
+  }
+
+  /** The Markdown files to read for the current scope. */
+  private files(): TFile[] {
+    if (this.mode === 'vault') return this.app.vault.getMarkdownFiles();
+    const active = this.app.workspace.getActiveFile();
+    return active && active.extension === 'md' ? [active] : [];
+  }
+
+  private async scan(file: TFile): Promise<FoundCallout[]> {
+    // The metadata cache lists a note's list items without reading it, so
+    // notes without any are never opened.
+    if (!this.app.metadataCache.getFileCache(file)?.listItems?.length) return [];
+    const hit = this.cache.get(file.path);
+    if (hit && hit.mtime === file.stat.mtime) return hit.found;
+    const found = extractCallouts(await this.app.vault.cachedRead(file), this.plugin.settings.callouts);
+    this.cache.set(file.path, { mtime: file.stat.mtime, found });
+    return found;
+  }
+
+  private async render(): Promise<void> {
+    const token = ++this.token;
+    const items: OverviewItem[] = [];
+    for (const file of this.files()) {
+      const found = await this.scan(file);
+      if (token !== this.token) return;
+      for (const f of found) items.push({ ...f, file });
+    }
+    if (token !== this.token) return;
+    this.draw(items);
+  }
+
+  private draw(items: OverviewItem[]): void {
+    const el = this.contentEl;
+    el.empty();
+    const callouts = this.plugin.settings.callouts;
+
+    const bar = el.createDiv({ cls: 'lic-ov-scope' });
+    for (const [scope, label] of [['note', 'This note'], ['vault', 'Whole vault']] as const) {
+      const button = bar.createEl('button', { cls: 'lic-ov-scope-button', text: label, attr: { 'data-scope': scope } });
+      button.toggleClass('mod-cta', this.mode === scope);
+      button.setAttribute('aria-pressed', String(this.mode === scope));
+      button.addEventListener('click', () => {
+        if (this.mode === scope) return;
+        this.mode = scope;
+        this.app.workspace.requestSaveLayout();
+        void this.render();
+      });
+    }
+
+    const all = groupByCallout(items, callouts);
+    if (all.length === 0) {
+      el.createDiv({
+        cls: 'lic-ov-empty',
+        text: this.mode === 'note' ? 'No callout items in this note.' : 'No callout items in the vault.',
+      });
+      return;
+    }
+
+    const filters = el.createDiv({ cls: 'lic-ov-filters' });
+    for (const group of all) {
+      const { callout } = group;
+      const on = this.only.size === 0 || this.only.has(callout.char);
+      const button = filters.createEl('button', {
+        cls: 'lic-ov-filter',
+        attr: { 'data-lic': callout.char, 'aria-pressed': String(on), 'aria-label': callout.name ?? callout.char },
+      });
+      button.toggleClass('is-off', !on);
+      this.marker(button, callout);
+      button.createSpan({ cls: 'lic-ov-count', text: String(group.items.length) });
+      button.addEventListener('click', () => {
+        // From "all shown", a click picks that one callout; after that
+        // clicks add or remove callouts, and none left means all again.
+        const present = all.map((g) => g.callout.char);
+        const next = new Set(this.only.size === 0 ? [callout.char] : [...this.only].filter((c) => present.includes(c)));
+        if (this.only.size > 0) {
+          if (next.has(callout.char)) next.delete(callout.char);
+          else next.add(callout.char);
+        }
+        this.only = next.size === present.length || next.size === 0 ? new Set() : next;
+        this.app.workspace.requestSaveLayout();
+        this.draw(items);
+      });
+    }
+
+    for (const group of all) {
+      const { callout } = group;
+      if (this.only.size > 0 && !this.only.has(callout.char)) continue;
+      const section = el.createDiv({ cls: 'lic-ov-group', attr: { 'data-lic': callout.char } });
+      const head = section.createDiv({ cls: 'lic-ov-head' });
+      this.marker(head, callout);
+      head.createSpan({ cls: 'lic-ov-name', text: callout.name ?? callout.char });
+      head.createSpan({ cls: 'lic-ov-count', text: String(group.items.length) });
+      for (const item of group.items) {
+        const row = section.createDiv({ cls: 'lic-ov-item', attr: { 'data-line': String(item.line), 'data-path': item.file.path } });
+        row.style.setProperty('--lic-color', callout.color);
+        row.createSpan({ cls: 'lic-ov-text', text: truncate(plainText(item.text), SNIPPET_LENGTH) || '(empty)' });
+        if (this.mode === 'vault') row.createSpan({ cls: 'lic-ov-note', text: item.file.basename });
+        row.addEventListener('click', () => void this.jump(item));
+      }
+    }
+  }
+
+  private marker(parent: HTMLElement, callout: Callout): void {
+    const marker = parent.createSpan({ cls: 'lic-marker', text: callout.char });
+    marker.style.setProperty('--lic-color', callout.color);
+    if (callout.icon && getIcon(callout.icon)) {
+      marker.empty();
+      setIcon(marker, callout.icon);
+    }
+  }
+
+  /** Opens the note (in the tab that already shows it, if any) with the cursor on the item. */
+  private async jump(item: OverviewItem): Promise<void> {
+    const { workspace } = this.app;
+    const open = workspace
+      .getLeavesOfType('markdown')
+      .find((leaf) => leaf.view instanceof MarkdownView && leaf.view.file?.path === item.file.path);
+    const leaf = open ?? workspace.getLeaf(false);
+    await leaf.openFile(item.file, { eState: { line: item.line } });
+    workspace.setActiveLeaf(leaf, { focus: true });
+    const view = leaf.view;
+    if (view instanceof MarkdownView && view.getMode() === 'source') {
+      const pos = { line: Math.min(item.line, view.editor.lastLine()), ch: 0 };
+      view.editor.setCursor(pos);
+      view.editor.scrollIntoView({ from: pos, to: pos }, true);
+      view.editor.focus();
+    }
   }
 }
 
