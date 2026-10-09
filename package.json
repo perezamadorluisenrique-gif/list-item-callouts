@@ -1,6 +1,6 @@
 {
   "name": "list-item-callouts",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "List Item Callouts for Obsidian - Highlight single list items as coloured callouts by starting them with a character such as & ! ? or @. Compatible with List Callouts notes.",
   "main": "main.js",
   "scripts": {

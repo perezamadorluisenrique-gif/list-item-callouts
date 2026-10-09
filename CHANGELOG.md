@@ -4,7 +4,7 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
-## Unreleased
+## 0.2.0
 
 - New **Open the callout overview** command: a sidebar that lists every callout item in the current note or the whole vault, grouped by callout with counts, with a filter per callout and click to jump to the line.
 

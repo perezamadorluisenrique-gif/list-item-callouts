@@ -1,7 +1,7 @@
 {
   "id": "list-item-callouts",
   "name": "List Item Callouts",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "minAppVersion": "1.0.0",
   "description": "Highlight single list items as coloured callouts by starting them with a character such as & ! ? or @. Compatible with List Callouts notes.",
   "author": "Siulved54",
