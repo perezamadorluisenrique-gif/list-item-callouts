@@ -4,6 +4,10 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## 0.3.2
+
+- On a phone, **Open the callout overview** now shows the overview. The sidebar drawer used to open on whichever tab it showed last, such as Backlinks.
+
 ## 0.3.1
 
 - The callout overview no longer misses the callouts that come after a `$$` written in inline code, or after a `$$` that nothing closes.
