@@ -117,7 +117,9 @@ export default class ListItemCalloutsPlugin extends Plugin {
       if (!leaf) return;
       await leaf.setViewState({ type: VIEW_TYPE, active: true });
     }
-    workspace.rightSplit.expand();
+    // revealLeaf picks the overview's tab: on a phone the sidebar is a drawer
+    // that otherwise opens on whatever tab it showed last.
+    await workspace.revealLeaf(leaf);
     workspace.setActiveLeaf(leaf, { focus: true });
   }
 
