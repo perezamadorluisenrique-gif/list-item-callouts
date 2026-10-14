@@ -14,6 +14,7 @@ import {
   debounce,
   editorLivePreviewField,
   getIcon,
+  requireApiVersion,
   setIcon,
 } from 'obsidian';
 import type { ViewStateResult, WorkspaceLeaf } from 'obsidian';
@@ -119,7 +120,8 @@ export default class ListItemCalloutsPlugin extends Plugin {
     }
     // revealLeaf picks the overview's tab: on a phone the sidebar is a drawer
     // that otherwise opens on whatever tab it showed last.
-    await workspace.revealLeaf(leaf);
+    if (requireApiVersion('1.7.2')) await workspace.revealLeaf(leaf);
+    else workspace.rightSplit.expand();
     workspace.setActiveLeaf(leaf, { focus: true });
   }
 
