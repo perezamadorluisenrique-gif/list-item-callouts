@@ -91,3 +91,8 @@ test('groupByCallout follows the configured order and drops empty groups', () =>
   const groups = groupByCallout(items, C);
   assert.deepEqual(groups.map((g) => [g.callout.char, g.items.length]), [['&', 1], ['!', 2]]);
 });
+
+test('a $$ in inline code does not hide the callouts after it', () => {
+  const note = ['Display maths is written between `$$` signs.', '- & One', '``a ` b`` and `$$`', '- ! Two'].join('\n');
+  assert.deepEqual(extractCallouts(note, C).map((f) => f.char), ['&', '!']);
+});

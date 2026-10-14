@@ -29,6 +29,10 @@ export function extractCallouts(content: string, callouts: readonly Callout[]): 
   }
   let fence: { char: string; length: number } | null = null;
   let inMath = false;
+  let lastDollars = -1;
+  lines.forEach((line, i) => {
+    if (withoutInlineCode(line).includes('$$')) lastDollars = i;
+  });
   for (let i = start; i < lines.length; i++) {
     const line = lines[i];
     const open = /^[ \t]*(`{3,}|~{3,})/.exec(line);
@@ -37,16 +41,19 @@ export function extractCallouts(content: string, callouts: readonly Callout[]): 
       if (close && close[1][0] === fence.char && close[1].length >= fence.length) fence = null;
       continue;
     }
+    // A `$$` inside inline code is text about maths, not maths.
+    const prose = withoutInlineCode(line);
     if (inMath) {
-      if (line.includes('$$')) inMath = false;
+      if (prose.includes('$$')) inMath = false;
       continue;
     }
     if (open) {
       fence = { char: open[1][0], length: open[1].length };
       continue;
     }
-    const dollars = line.split('$$').length - 1;
-    if (dollars % 2 === 1) {
+    const dollars = prose.split('$$').length - 1;
+    // A `$$` that nothing below closes is two dollar signs, not maths.
+    if (dollars % 2 === 1 && i < lastDollars) {
       inMath = true;
       continue;
     }
@@ -55,6 +62,32 @@ export function extractCallouts(content: string, callouts: readonly Callout[]): 
     found.push({ line: i, char: hit.callout.char, text: line.slice(hit.to).trim() });
   }
   return found;
+}
+
+/** `line` with its inline code spans taken out: a run of backticks up to the next run as long. */
+function withoutInlineCode(line: string): string {
+  let out = '';
+  let i = 0;
+  while (i < line.length) {
+    if (line[i] !== '`') {
+      out += line[i++];
+      continue;
+    }
+    let run = 1;
+    while (line[i + run] === '`') run++;
+    const runs = /`+/g;
+    runs.lastIndex = i + run;
+    let close = -1;
+    for (let m = runs.exec(line); m; m = runs.exec(line)) {
+      if (m[0].length === run) {
+        close = m.index;
+        break;
+      }
+    }
+    if (close === -1) out += line.slice(i, i + run);
+    i = close === -1 ? i + run : close + run;
+  }
+  return out;
 }
 
 /** The text of an item without its markdown markup, for a one-line list. */
