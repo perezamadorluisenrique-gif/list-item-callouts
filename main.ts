@@ -27,6 +27,8 @@ import {
   DEFAULT_CALLOUTS,
   calloutAt,
   calloutAtText,
+  calloutLabel,
+  calloutName,
   continuationLines,
   nextCallout,
   readCallouts,
@@ -36,6 +38,7 @@ import {
   validChar,
 } from './src/callouts.ts';
 import type { Callout } from './src/callouts.ts';
+import { t } from './src/i18n.ts';
 import { extractCallouts, groupByCallout, plainText, truncate } from './src/overview.ts';
 import type { FoundCallout } from './src/overview.ts';
 
@@ -68,21 +71,21 @@ export default class ListItemCalloutsPlugin extends Plugin {
     this.registerView(VIEW_TYPE, (leaf) => new CalloutsView(leaf, this));
     this.addCommand({
       id: 'open-overview',
-      name: 'Open the callout overview',
+      name: t('command.openOverview'),
       icon: 'list-checks',
       callback: () => void this.openOverview(),
     });
 
     this.addCommand({
       id: 'toggle-callout',
-      name: 'Toggle callout on the list item',
+      name: t('command.toggleCallout'),
       icon: 'highlighter',
       editorCallback: (editor) =>
         this.editLines(editor, (line) => (calloutAt(line, this.settings.callouts) ? null : this.settings.callouts[0]?.char ?? null)),
     });
     this.addCommand({
       id: 'cycle-callout',
-      name: 'Cycle callout type on the list item',
+      name: t('command.cycleCallout'),
       icon: 'repeat',
       editorCallback: (editor) =>
         this.editLines(editor, (line) =>
@@ -91,13 +94,13 @@ export default class ListItemCalloutsPlugin extends Plugin {
     });
     this.addCommand({
       id: 'remove-callout',
-      name: 'Remove callout from the list item',
+      name: t('command.removeCallout'),
       icon: 'eraser',
       editorCallback: (editor) => this.editLines(editor, () => null),
     });
     this.addCommand({
       id: 'choose-callout',
-      name: 'Make the list item a callout…',
+      name: t('command.chooseCallout'),
       icon: 'palette',
       editorCallback: (editor) => {
         new CalloutPicker(this.app, this.settings.callouts, (callout) => this.editLines(editor, () => callout.char)).open();
@@ -349,7 +352,7 @@ class CalloutsView extends ItemView {
   }
 
   getDisplayText(): string {
-    return 'Callouts';
+    return t('overview.title');
   }
 
   getIcon(): string {
@@ -442,7 +445,7 @@ class CalloutsView extends ItemView {
     const callouts = this.plugin.settings.callouts;
 
     const bar = el.createDiv({ cls: 'lic-ov-scope' });
-    for (const [scope, label] of [['note', 'This note'], ['vault', 'Whole vault']] as const) {
+    for (const [scope, label] of [['note', t('overview.thisNote')], ['vault', t('overview.wholeVault')]] as const) {
       const button = bar.createEl('button', { cls: 'lic-ov-scope-button', text: label, attr: { 'data-scope': scope } });
       button.toggleClass('mod-cta', this.mode === scope);
       button.setAttribute('aria-pressed', String(this.mode === scope));
@@ -458,7 +461,7 @@ class CalloutsView extends ItemView {
     if (all.length === 0) {
       el.createDiv({
         cls: 'lic-ov-empty',
-        text: this.mode === 'note' ? 'No callout items in this note.' : 'No callout items in the vault.',
+        text: this.mode === 'note' ? t('overview.emptyNote') : t('overview.emptyVault'),
       });
       return;
     }
@@ -469,7 +472,7 @@ class CalloutsView extends ItemView {
       const on = this.only.size === 0 || this.only.has(callout.char);
       const button = filters.createEl('button', {
         cls: 'lic-ov-filter',
-        attr: { 'data-lic': callout.char, 'aria-pressed': String(on), 'aria-label': callout.name ?? callout.char },
+        attr: { 'data-lic': callout.char, 'aria-pressed': String(on), 'aria-label': calloutLabel(callout) },
       });
       button.toggleClass('is-off', !on);
       this.marker(button, callout);
@@ -495,12 +498,12 @@ class CalloutsView extends ItemView {
       const section = el.createDiv({ cls: 'lic-ov-group', attr: { 'data-lic': callout.char } });
       const head = section.createDiv({ cls: 'lic-ov-head' });
       this.marker(head, callout);
-      head.createSpan({ cls: 'lic-ov-name', text: callout.name ?? callout.char });
+      head.createSpan({ cls: 'lic-ov-name', text: calloutLabel(callout) });
       head.createSpan({ cls: 'lic-ov-count', text: String(group.items.length) });
       for (const item of group.items) {
         const row = section.createDiv({ cls: 'lic-ov-item', attr: { 'data-line': String(item.line), 'data-path': item.file.path } });
         row.style.setProperty('--lic-color', callout.color);
-        row.createSpan({ cls: 'lic-ov-text', text: truncate(plainText(item.text), SNIPPET_LENGTH) || '(empty)' });
+        row.createSpan({ cls: 'lic-ov-text', text: truncate(plainText(item.text), SNIPPET_LENGTH) || t('overview.emptyItem') });
         if (this.mode === 'vault') row.createSpan({ cls: 'lic-ov-note', text: item.file.basename });
         row.addEventListener('click', () => void this.jump(item));
       }
@@ -550,7 +553,7 @@ class MarkerWidget extends WidgetType {
   }
 
   toDOM(): HTMLElement {
-    const span = createSpan({ cls: 'lic-marker', text: this.callout.char, attr: { 'aria-label': this.callout.name ?? this.callout.char } });
+    const span = createSpan({ cls: 'lic-marker', text: this.callout.char, attr: { 'aria-label': calloutLabel(this.callout) } });
     if (this.callout.icon && getIcon(this.callout.icon)) {
       span.empty();
       setIcon(span, this.callout.icon);
@@ -592,7 +595,7 @@ class CalloutPicker extends FuzzySuggestModal<Callout> {
     private onChoose: (callout: Callout) => void,
   ) {
     super(app);
-    this.setPlaceholder('Pick a callout for the list item');
+    this.setPlaceholder(t('picker.placeholder'));
   }
 
   getItems(): Callout[] {
@@ -600,7 +603,7 @@ class CalloutPicker extends FuzzySuggestModal<Callout> {
   }
 
   getItemText(callout: Callout): string {
-    return `${callout.char} ${callout.name ?? ''}`.trim();
+    return `${callout.char} ${calloutName(callout)}`.trim();
   }
 
   renderSuggestion(match: { item: Callout }, el: HTMLElement): void {
@@ -612,7 +615,7 @@ class CalloutPicker extends FuzzySuggestModal<Callout> {
       marker.empty();
       setIcon(marker, callout.icon);
     }
-    row.createSpan({ text: callout.name ?? callout.char });
+    row.createSpan({ text: calloutLabel(callout) });
   }
 
   onChooseItem(callout: Callout): void {
@@ -622,22 +625,10 @@ class CalloutPicker extends FuzzySuggestModal<Callout> {
 
 /** Names and descriptions shared by both renderings of the settings tab. */
 const SETTING_TEXT = {
-  colourContinuation: {
-    name: 'Colour wrapped lines',
-    desc: 'Colour the lines an item wraps onto in the editor, not just its first line.',
-  },
-  syntax: {
-    name: 'Writing a callout',
-    desc: 'Start a list item with one of these characters and a space, as in "- & Buy milk". An icon, if set, is shown in place of the character; use any Lucide icon name, such as "star" or "alert-triangle".',
-  },
-  restore: {
-    name: 'Restore defaults',
-    desc: 'Replace your callouts with the seven built-in ones.',
-  },
-  legacy: {
-    name: 'Import from List Callouts',
-    desc: 'Copy the characters, colours and icons you set up in the List Callouts plugin, if it was ever installed in this vault.',
-  },
+  colourContinuation: { name: t('setting.colourContinuation.name'), desc: t('setting.colourContinuation.desc') },
+  syntax: { name: t('setting.syntax.name'), desc: t('setting.syntax.desc') },
+  restore: { name: t('setting.restore.name'), desc: t('setting.restore.desc') },
+  legacy: { name: t('setting.legacy.name'), desc: t('setting.legacy.desc') },
 };
 
 class ListItemCalloutsSettingTab extends PluginSettingTab {
@@ -666,10 +657,10 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
       SETTING_TEXT.syntax,
       {
         type: 'list',
-        heading: 'Callouts',
-        emptyState: 'No callouts. Add one, or restore the defaults.',
+        heading: t('setting.callouts.heading'),
+        emptyState: t('setting.callouts.empty'),
         items: settings.callouts.map((callout, index) => ({
-          name: `${callout.char} ${callout.name ?? ''}`.trim(),
+          name: `${callout.char} ${calloutName(callout)}`.trim(),
           aliases: callout.icon ? [callout.icon] : undefined,
           render: (setting: Setting) => this.calloutRow(setting, callout, index),
         })),
@@ -682,7 +673,7 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
           settings.callouts.splice(to, 0, moved);
           this.saveAndRedraw();
         },
-        addItem: { name: 'Add callout', action: () => this.addCallout() },
+        addItem: { name: t('setting.callouts.add'), action: () => this.addCallout() },
       },
       { ...SETTING_TEXT.restore, action: () => this.restoreDefaults() },
       { ...SETTING_TEXT.legacy, action: () => void this.importLegacy() },
@@ -716,7 +707,7 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
         }),
       );
 
-    new Setting(containerEl).setName('Callouts').setHeading();
+    new Setting(containerEl).setName(t('setting.callouts.heading')).setHeading();
     containerEl.createEl('p', { cls: 'setting-item-description', text: SETTING_TEXT.syntax.desc });
 
     settings.callouts.forEach((callout, index) => {
@@ -731,13 +722,13 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
     });
 
     new Setting(containerEl)
-      .addButton((button) => button.setButtonText('Add callout').setCta().onClick(() => this.addCallout()))
+      .addButton((button) => button.setButtonText(t('setting.callouts.add')).setCta().onClick(() => this.addCallout()))
       .addButton((button) => button.setButtonText(SETTING_TEXT.restore.name).onClick(() => this.restoreDefaults()));
 
     new Setting(containerEl)
       .setName(SETTING_TEXT.legacy.name)
       .setDesc(SETTING_TEXT.legacy.desc)
-      .addButton((button) => button.setButtonText('Import').onClick(() => void this.importLegacy()));
+      .addButton((button) => button.setButtonText(t('setting.legacy.button')).onClick(() => void this.importLegacy()));
   }
 
   /** One callout's row: character, name, icon and colour. */
@@ -747,10 +738,10 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
     row.setClass('lic-setting-row');
     row.nameEl.empty();
     row.nameEl.createSpan({ cls: 'lic-marker', text: callout.char }).style.setProperty('--lic-color', callout.color);
-    row.nameEl.createSpan({ text: ` ${callout.name ?? ''}` });
+    row.nameEl.createSpan({ text: ` ${calloutName(callout)}` });
     row.addText((text) =>
       text
-        .setPlaceholder('Char')
+        .setPlaceholder(t('setting.row.char'))
         .setValue(callout.char)
         .onChange((value) => {
           const taken = settings.callouts.some((c, i) => i !== index && c.char === value);
@@ -762,8 +753,8 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
     );
     row.addText((text) =>
       text
-        .setPlaceholder('Name')
-        .setValue(callout.name ?? '')
+        .setPlaceholder(t('setting.row.name'))
+        .setValue(calloutName(callout))
         .onChange((value) => {
           callout.name = value.trim() || undefined;
           save();
@@ -771,7 +762,7 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
     );
     row.addText((text) =>
       text
-        .setPlaceholder('Icon')
+        .setPlaceholder(t('setting.row.icon'))
         .setValue(callout.icon ?? '')
         .onChange((value) => {
           const icon = value.trim();
@@ -806,7 +797,7 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
 
   private async importLegacy(): Promise<void> {
     const n = await this.plugin.importLegacy();
-    new Notice(n > 0 ? `Imported ${n} callouts from List Callouts.` : 'No List Callouts settings were found in this vault.');
+    new Notice(n === 0 ? t('notice.noLegacy') : n === 1 ? t('notice.imported.one') : t('notice.imported.other', { count: n }));
     this.redraw();
   }
 

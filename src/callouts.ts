@@ -6,6 +6,9 @@
 // plugin (mgmeyers/obsidian-list-callouts) used, so notes written for it
 // look the same here.
 
+import { t } from './i18n.ts';
+import type { MessageKey } from './i18n.ts';
+
 export interface Callout {
   /** What starts the item: one to three characters, no spaces. */
   char: string;
@@ -26,6 +29,33 @@ export const DEFAULT_CALLOUTS: readonly Callout[] = [
   { char: '$', color: '0, 200, 83', name: 'Money' },
   { char: '%', color: '158, 158, 158', name: 'Low priority' },
 ];
+
+/** The built-in names, English as stored in data.json, and the messages that show them in the app's language. */
+const BUILT_IN_NAMES = new Map<string, Extract<MessageKey, `callout.${string}`>>([
+  ['Highlight', 'callout.highlight'],
+  ['Question', 'callout.question'],
+  ['Important', 'callout.important'],
+  ['Aside', 'callout.aside'],
+  ['Person or place', 'callout.personOrPlace'],
+  ['Money', 'callout.money'],
+  ['Low priority', 'callout.lowPriority'],
+]);
+
+/**
+ * What to show as the callout's name: '' when it has none. One of the built-in
+ * names, as long as the user has not renamed it, is shown in the app's
+ * language; the stored name is never changed.
+ */
+export function calloutName(callout: Callout): string {
+  const name = callout.name ?? '';
+  const key = BUILT_IN_NAMES.get(name);
+  return key ? t(key) : name;
+}
+
+/** The name, or the character for a callout without one. */
+export function calloutLabel(callout: Callout): string {
+  return calloutName(callout) || callout.char;
+}
 
 /** The list marker, an optional task box, and the space before the text. */
 const LIST_ITEM = /^([ \t]*)([-*+]|\d{1,9}[.)])([ \t]+)(\[.\][ \t]+)?/;

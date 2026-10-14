@@ -15,6 +15,8 @@ character and a space:
 It works in Live Preview, in Source mode and in Reading view, on desktop and
 on mobile, in bullet, numbered and task lists.
 
+**Interface languages:** English, 简体中文, 日本語, 한국어, Español, Deutsch, Français, Português (Brasil) and Русский, following Obsidian's language setting. A translation that reads wrong? [Open an issue](https://github.com/perezamadorluisenrique-gif/list-item-callouts/issues/new/choose) with the text and what it should say.
+
 ## Coming from List Callouts
 
 This plugin reads the same syntax as
