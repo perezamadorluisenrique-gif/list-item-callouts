@@ -19,7 +19,7 @@ import {
 } from 'obsidian';
 import type { ViewStateResult, WorkspaceLeaf } from 'obsidian';
 import { syntaxTree } from '@codemirror/language';
-import { RangeSetBuilder } from '@codemirror/state';
+import { EditorState, RangeSetBuilder } from '@codemirror/state';
 import type { Extension } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin, WidgetType } from '@codemirror/view';
 import type { DecorationSet, ViewUpdate } from '@codemirror/view';
@@ -30,8 +30,10 @@ import {
   calloutAtText,
   calloutLabel,
   calloutName,
-  continuationLines,
+  blockOwner,
+  lowContrastThemes,
   nextCallout,
+  paintPlan,
   readCallouts,
   setCallout,
   toHex,
@@ -47,11 +49,14 @@ interface ListItemCalloutsSettings {
   callouts: Callout[];
   /** Colour the wrapped lines of an item as well as its first line. */
   colourContinuation: boolean;
+  /** Colour the items nested under a callout with its colour, as Reading view does. */
+  colourChildren: boolean;
 }
 
 const DEFAULT_SETTINGS: ListItemCalloutsSettings = {
   callouts: DEFAULT_CALLOUTS.map((c) => ({ ...c })),
   colourContinuation: true,
+  colourChildren: true,
 };
 
 /** Where List Callouts keeps its settings, relative to the config folder. */
@@ -217,6 +222,10 @@ export default class ListItemCalloutsPlugin extends Plugin {
       li.addClass('lic-callout');
       li.setAttribute('data-lic', callout.char);
       li.style.setProperty('--lic-color', callout.color);
+      if (callout.textColor) {
+        li.addClass('lic-has-text');
+        li.style.setProperty('--lic-text', callout.textColor);
+      }
       const marker = createSpan({ cls: 'lic-marker', text: callout.char });
       if (callout.icon && getIcon(callout.icon)) {
         marker.empty();
@@ -245,61 +254,57 @@ export default class ListItemCalloutsPlugin extends Plugin {
       const live = state.field(editorLivePreviewField, false) === true;
       const tree = syntaxTree(state);
       const doc = state.doc;
-      let colouredUpTo = 0;
-      let processed = 0;
+      const tabSize = state.facet(EditorState.tabSize);
+      let emitted = 0;
 
       for (const { from, to } of view.visibleRanges) {
-        // Start a little above the viewport so the item a visible
-        // continuation line belongs to is found.
-        let lineNo = Math.max(processed + 1, doc.lineAt(from).number - 20);
+        const firstLine = Math.max(doc.lineAt(from).number, emitted + 1);
         const lastLine = doc.lineAt(to).number;
-        while (lineNo <= lastLine) {
-          const line = doc.line(lineNo);
-          lineNo++;
-          processed = Math.max(processed, line.number);
-          if (line.number <= colouredUpTo) continue;
-          const hit = calloutAt(line.text, settings.callouts);
-          if (!hit || isCode(tree.resolveInner(line.from, 1).type.name)) continue;
-
-          // How many lines the item wraps onto, so the last one can round
-          // its bottom corners (a class, not `:has()`, which is slow).
-          let extra = 0;
-          if (settings.colourContinuation) {
-            const lines: string[] = [];
-            for (let i = line.number + 1; i <= Math.min(doc.lines, line.number + 200); i++) lines.push(doc.line(i).text);
-            extra = continuationLines([line.text, ...lines], 0);
+        if (firstLine > lastLine) continue;
+        // Read from where the outermost item above the viewport starts, so
+        // a visible child finds its parent however far up it is, and a
+        // little below it so the last visible item knows where it ends.
+        const lookBack = Math.max(1, firstLine - 1000);
+        const lookAhead = Math.min(doc.lines, lastLine + 200);
+        const lines: string[] = [];
+        for (let n = lookBack; n <= lookAhead; n++) lines.push(doc.line(n).text);
+        const owner = blockOwner(lines, firstLine - lookBack, tabSize);
+        const base = owner === null ? firstLine - lookBack : owner;
+        const plan = paintPlan(lines.slice(base), settings.callouts, {
+          colourContinuation: settings.colourContinuation,
+          colourChildren: settings.colourChildren,
+          tabSize,
+          isCode: (i) => isCode(tree.resolveInner(doc.line(lookBack + base + i).from, 1).type.name),
+        });
+        for (const paint of plan) {
+          const line = doc.line(lookBack + base + paint.line);
+          if (line.number < firstLine || line.number > lastLine) continue;
+          emitted = line.number;
+          const { callout } = paint;
+          const classes = ['lic-callout'];
+          if (paint.role === 'continued') classes.push('lic-continued');
+          if (paint.role === 'child') classes.push('lic-child');
+          if (paint.first) classes.push('lic-first');
+          if (paint.last) classes.push('lic-last');
+          let style = `--lic-color: ${callout.color}`;
+          if (callout.textColor) {
+            classes.push('lic-has-text');
+            style += `; --lic-text: ${callout.textColor}`;
           }
-
-          const attrs = {
-            class: extra === 0 ? 'lic-callout lic-first lic-last' : 'lic-callout lic-first',
-            style: `--lic-color: ${hit.callout.color}`,
-            'data-lic': hit.callout.char,
-          };
+          const attrs: Record<string, string> = { class: classes.join(' '), style };
+          if (paint.role === 'first') attrs['data-lic'] = callout.char;
+          else if (paint.role === 'child') attrs['data-lic-parent'] = callout.char;
           builder.add(line.from, line.from, Decoration.line({ attributes: attrs }));
-          const markFrom = line.from + hit.from;
-          const markTo = line.from + hit.to;
+          if (paint.role !== 'first') continue;
+          const hit = calloutAt(line.text, settings.callouts);
+          if (!hit) continue;
           builder.add(
-            markFrom,
-            markTo,
+            line.from + hit.from,
+            line.from + hit.to,
             live
               ? Decoration.replace({ widget: new MarkerWidget(hit.callout) })
               : Decoration.mark({ class: 'lic-marker' }),
           );
-
-          if (extra > 0) {
-            for (let i = 1; i <= extra; i++) {
-              const next = doc.line(line.number + i);
-              const cls = i === extra ? 'lic-callout lic-continued lic-last' : 'lic-callout lic-continued';
-              builder.add(
-                next.from,
-                next.from,
-                Decoration.line({ attributes: { class: cls, style: `--lic-color: ${hit.callout.color}` } }),
-              );
-            }
-            colouredUpTo = line.number + extra;
-            lineNo = Math.max(lineNo, colouredUpTo + 1);
-            processed = Math.max(processed, colouredUpTo);
-          }
         }
       }
       return builder.finish();
@@ -507,6 +512,10 @@ class CalloutsView extends ItemView {
       for (const item of group.items) {
         const row = section.createDiv({ cls: 'lic-ov-item', attr: { 'data-line': String(item.line), 'data-path': item.file.path } });
         row.style.setProperty('--lic-color', callout.color);
+        if (callout.textColor) {
+          row.addClass('lic-has-text');
+          row.style.setProperty('--lic-text', callout.textColor);
+        }
         row.createSpan({ cls: 'lic-ov-text', text: truncate(plainText(item.text), SNIPPET_LENGTH) || t('overview.emptyItem') });
         if (this.mode === 'vault') row.createSpan({ cls: 'lic-ov-note', text: item.file.basename });
         row.addEventListener('click', () => void this.jump(item));
@@ -630,6 +639,7 @@ class CalloutPicker extends FuzzySuggestModal<Callout> {
 /** Names and descriptions shared by both renderings of the settings tab. */
 const SETTING_TEXT = {
   colourContinuation: { name: t('setting.colourContinuation.name'), desc: t('setting.colourContinuation.desc') },
+  colourChildren: { name: t('setting.colourChildren.name'), desc: t('setting.colourChildren.desc') },
   syntax: { name: t('setting.syntax.name'), desc: t('setting.syntax.desc') },
   restore: { name: t('setting.restore.name'), desc: t('setting.restore.desc') },
   legacy: { name: t('setting.legacy.name'), desc: t('setting.legacy.desc') },
@@ -657,6 +667,10 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
       {
         ...SETTING_TEXT.colourContinuation,
         control: { type: 'toggle', key: 'colourContinuation', defaultValue: DEFAULT_SETTINGS.colourContinuation },
+      },
+      {
+        ...SETTING_TEXT.colourChildren,
+        control: { type: 'toggle', key: 'colourChildren', defaultValue: DEFAULT_SETTINGS.colourChildren },
       },
       SETTING_TEXT.syntax,
       {
@@ -707,6 +721,16 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(settings.colourContinuation).onChange((value) => {
           settings.colourContinuation = value;
+          void this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(SETTING_TEXT.colourChildren.name)
+      .setDesc(SETTING_TEXT.colourChildren.desc)
+      .addToggle((toggle) =>
+        toggle.setValue(settings.colourChildren).onChange((value) => {
+          settings.colourChildren = value;
           void this.plugin.saveSettings();
         }),
       );
@@ -776,14 +800,40 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
           save();
         }),
     );
-    row.addColorPicker((picker) =>
+    row.addColorPicker((picker) => {
       picker.setValue(toHex(callout.color)).onChange((value) => {
         const rgb = toRgb(value);
         if (!rgb) return;
         callout.color = rgb;
         save();
-      }),
+      });
+    });
+    row.addColorPicker((picker) => {
+      picker.setValue(toHex(callout.textColor ?? '128, 128, 128')).onChange((value) => {
+        const rgb = toRgb(value);
+        if (!rgb) return;
+        callout.textColor = rgb;
+        save();
+        this.redraw();
+      });
+    });
+    row.addExtraButton((button) =>
+      button.setIcon('rotate-ccw').onClick(() => {
+        delete callout.textColor;
+        save();
+        this.redraw();
+      }).extraSettingsEl.setAttribute('aria-label', t('setting.row.textReset')),
     );
+    const pickers = row.controlEl.querySelectorAll('input[type="color"]');
+    pickers[0]?.setAttribute('aria-label', t('setting.row.background'));
+    pickers[1]?.setAttribute('aria-label', t('setting.row.text'));
+    const low = lowContrastThemes(callout);
+    if (low.length > 0) {
+      row.descEl.createDiv({
+        cls: 'setting-item-description mod-warning',
+        text: low.length === 2 ? t('setting.row.lowContrast.both') : low[0] === 'light' ? t('setting.row.lowContrast.light') : t('setting.row.lowContrast.dark'),
+      });
+    }
   }
 
   private addCallout(): void {

@@ -29,6 +29,8 @@ const ptBR: Messages = {
   // Settings
   'setting.colourContinuation.name': 'Colorir linhas quebradas',
   'setting.colourContinuation.desc': 'Colore no editor as linhas para as quais um item se estende, não apenas a primeira linha.',
+  'setting.colourChildren.name': "Colorir itens aninhados",
+  'setting.colourChildren.desc': "Colore no editor os itens aninhados sob um callout com a cor dele. A visualização de leitura sempre os mantém dentro do fundo do item pai, porque é assim que o Markdown aninha uma lista. Requer \"Colorir linhas quebradas\".",
   'setting.syntax.name': 'Como escrever um destaque',
   'setting.syntax.desc':
     'Comece um item da lista com um destes caracteres e um espaço, como em "- & Buy milk". Um ícone, se definido, aparece no lugar do caractere; use qualquer nome de ícone do Lucide, como "star" ou "alert-triangle".',
@@ -43,6 +45,12 @@ const ptBR: Messages = {
   'setting.row.char': 'Caractere',
   'setting.row.name': 'Nome',
   'setting.row.icon': 'Ícone',
+  'setting.row.background': "Fundo",
+  'setting.row.text': "Cor do texto",
+  'setting.row.textReset': "Usar a cor de texto do tema",
+  'setting.row.lowContrast.light': "Contraste baixo no tema claro",
+  'setting.row.lowContrast.dark': "Contraste baixo no tema escuro",
+  'setting.row.lowContrast.both': "Contraste baixo nos temas claro e escuro",
   'notice.imported.one': '1 destaque importado do List Callouts.',
   'notice.imported.other': '{count} destaques importados do List Callouts.',
   'notice.noLegacy': 'Nenhuma configuração do List Callouts foi encontrada neste cofre.',

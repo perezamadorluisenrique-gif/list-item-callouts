@@ -29,6 +29,8 @@ const de: Messages = {
   // Settings
   'setting.colourContinuation.name': 'Umbrochene Zeilen einfärben',
   'setting.colourContinuation.desc': 'Färbt im Editor auch die Zeilen ein, auf die ein Eintrag umbricht, nicht nur seine erste Zeile.',
+  'setting.colourChildren.name': "Verschachtelte Einträge färben",
+  'setting.colourChildren.desc': "Färbt im Editor die unter einem Callout verschachtelten Einträge mit dessen Farbe. Die Leseansicht hält sie immer im Hintergrund des übergeordneten Eintrags, weil Markdown Listen so verschachtelt. Setzt „Umbrochene Zeilen einfärben“ voraus.",
   'setting.syntax.name': 'Einen Callout schreiben',
   'setting.syntax.desc':
     'Beginne einen Listeneintrag mit einem dieser Zeichen und einem Leerzeichen, etwa "- & Buy milk". Ein Symbol, falls festgelegt, wird anstelle des Zeichens angezeigt; verwende einen beliebigen Lucide-Symbolnamen, etwa "star" oder "alert-triangle".',
@@ -44,6 +46,12 @@ const de: Messages = {
   'setting.row.char': 'Zeichen',
   'setting.row.name': 'Name',
   'setting.row.icon': 'Symbol',
+  'setting.row.background': "Hintergrund",
+  'setting.row.text': "Textfarbe",
+  'setting.row.textReset': "Textfarbe des Themes verwenden",
+  'setting.row.lowContrast.light': "Geringer Kontrast im hellen Theme",
+  'setting.row.lowContrast.dark': "Geringer Kontrast im dunklen Theme",
+  'setting.row.lowContrast.both': "Geringer Kontrast im hellen und dunklen Theme",
   'notice.imported.one': '1 Callout aus List Callouts importiert.',
   'notice.imported.other': '{count} Callouts aus List Callouts importiert.',
   'notice.noLegacy': 'In diesem Vault wurden keine Einstellungen von List Callouts gefunden.',

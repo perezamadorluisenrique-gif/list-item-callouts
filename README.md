@@ -61,6 +61,13 @@ The character needs a space after it, so `- $5 each` stays a plain item. In
 its place, add your own callouts, and restore the defaults. Code blocks, maths
 and properties are never coloured.
 
+Items nested under a callout take its colour in the editor too, as they do in
+Reading view; a nested callout keeps its own colour for its own block (turn this
+off with **Colour nested items**). Each callout also has a **Text colour**
+besides its **Background**: pick one for the item's text, or reset it to use the
+theme's. Links, tags and inline code keep their own colours. Settings warn when
+a text colour has low contrast on the background in the light or dark theme.
+
 ## Commands
 
 | Command | What it does |
@@ -91,8 +98,10 @@ it when you restart.
 
 The background strength is a CSS variable, `--lic-bg-opacity` (0.12 in light
 themes, 0.18 in dark ones), and the corners follow `--lic-radius`. Override
-them in a CSS snippet. Every callout line carries `data-lic="&"` (the
-character), for snippets that style one callout differently.
+them in a CSS snippet; `--lic-child-opacity` does the same for nested items in
+the editor. Every callout line carries `data-lic="&"` (the character), for
+snippets that style one callout differently; nested lines carry
+`data-lic-parent="&"` and the class `lic-child`.
 
 ## Privacy
 

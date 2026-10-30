@@ -18,6 +18,8 @@ export interface Callout {
   icon?: string;
   /** What the callout is for, shown in the picker and the settings. */
   name?: string;
+  /** `r, g, b` of the item's text; none leaves the theme's text colour. */
+  textColor?: string;
 }
 
 export const DEFAULT_CALLOUTS: readonly Callout[] = [
@@ -128,6 +130,150 @@ export function continuationLines(lines: readonly string[], index: number): numb
   return n;
 }
 
+/** Scans past this many lines when looking for where an item ends or starts. */
+const SCAN_LIMIT = 2000;
+
+/** Column of the first non-blank character, tabs expanded to `tabSize`. */
+function indentColumn(line: string, tabSize: number): number {
+  let col = 0;
+  for (const ch of line) {
+    if (ch === ' ') col++;
+    else if (ch === '\t') col += tabSize - (col % tabSize);
+    else break;
+  }
+  return col;
+}
+
+const BLOCK_START = /^[ \t]*(#{1,6}[ \t]|>|```|~~~|\||\$\$)/;
+const THEMATIC_BREAK = /^[ \t]*([-*_])([ \t]*\1){2,}[ \t]*$/;
+
+/**
+ * How many lines after the list item at `index` belong to it: its wrapped
+ * lines and everything nested under it. A line belongs when it is indented
+ * past the item's marker, or lazily continues its paragraph. It ends at the
+ * next item at the same or a lower level, a heading, a rule, a table or a
+ * quote at the margin, or two blank lines in a row. A single blank line
+ * stays inside only when the item goes on after it.
+ */
+export function itemBlock(lines: readonly string[], index: number, tabSize = 4): number {
+  const parent = indentColumn(lines[index] ?? '', tabSize);
+  let end = index;
+  let blanks = 0;
+  const stop = Math.min(lines.length, index + 1 + SCAN_LIMIT);
+  for (let i = index + 1; i < stop; i++) {
+    const line = lines[i];
+    if (line.trim() === '') {
+      if (++blanks >= 2) break;
+      continue;
+    }
+    const col = indentColumn(line, tabSize);
+    const item = listItem(line);
+    let inside: boolean;
+    if (item) inside = col > parent;
+    else if (col > parent) inside = true;
+    else inside = blanks === 0 && !BLOCK_START.test(line) && !THEMATIC_BREAK.test(line);
+    if (!inside) break;
+    blanks = 0;
+    end = i;
+  }
+  return end - index;
+}
+
+/**
+ * The outermost list item that contains the line at `index`, as an index
+ * into `lines`, or null when the line is in no list. Looks back at most
+ * `limit` lines, so a note of any length costs the same.
+ */
+export function blockOwner(lines: readonly string[], index: number, tabSize = 4, limit = 1000): number | null {
+  const first = lines[index];
+  if (first === undefined) return null;
+  let owner: number | null = null;
+  let below = first.trim() === '' ? Infinity : indentColumn(first, tabSize) + (listItem(first) ? 0 : 1);
+  let blanks = 0;
+  for (let i = index - 1; i >= Math.max(0, index - limit); i--) {
+    const line = lines[i];
+    if (line.trim() === '') {
+      if (++blanks >= 2) break;
+      continue;
+    }
+    blanks = 0;
+    const col = indentColumn(line, tabSize);
+    if (listItem(line)) {
+      if (col < below) {
+        owner = i;
+        below = col;
+        if (col === 0) break;
+      }
+    } else if (col < below && (col === 0 || BLOCK_START.test(line) || THEMATIC_BREAK.test(line))) {
+      break;
+    }
+  }
+  return owner;
+}
+
+export type PaintRole = 'first' | 'continued' | 'child';
+
+export interface Paint {
+  /** Index into the lines given to `paintPlan`. */
+  line: number;
+  callout: Callout;
+  /** `first` is the item's own line; `continued` wraps its text; `child` is nested under it. */
+  role: PaintRole;
+  /** First and last line of a run in one colour, which get rounded corners. */
+  first: boolean;
+  last: boolean;
+}
+
+export interface PaintOptions {
+  /** Colour the lines an item wraps onto, not just its first. */
+  colourContinuation: boolean;
+  /** Colour the items nested under a callout with its colour. Needs `colourContinuation`. */
+  colourChildren: boolean;
+  tabSize?: number;
+  /** Whether a line that looks like a callout is inside code and so is not one. */
+  isCode?: (line: number) => boolean;
+}
+
+/**
+ * Which lines get which callout's colour. A nested callout uses its own
+ * colour for its own block, and the lines after it go back to the parent's.
+ */
+export function paintPlan(lines: readonly string[], callouts: readonly Callout[], opts: PaintOptions): Paint[] {
+  const tabSize = opts.tabSize ?? 4;
+  const stack: { callout: Callout; end: number; wrapEnd: number; id: number }[] = [];
+  const out: Paint[] = [];
+  /** Which item painted each entry of `out`. */
+  const runs: number[] = [];
+  let ids = 0;
+  for (let i = 0; i < lines.length; i++) {
+    while (stack.length > 0 && stack[stack.length - 1].end < i) stack.pop();
+    const hit = calloutAt(lines[i], callouts);
+    if (hit && !opts.isCode?.(i)) {
+      const wrap = opts.colourContinuation ? continuationLines(lines.slice(i, i + 201), 0) : 0;
+      const block = opts.colourContinuation && opts.colourChildren ? itemBlock(lines, i, tabSize) : wrap;
+      const entry = { callout: hit.callout, end: i + Math.max(block, wrap), wrapEnd: i + wrap, id: ids++ };
+      stack.push(entry);
+      out.push({ line: i, callout: entry.callout, role: 'first', first: true, last: false });
+      runs.push(entry.id);
+      continue;
+    }
+    const top = stack[stack.length - 1];
+    if (!top) continue;
+    out.push({ line: i, callout: top.callout, role: i <= top.wrapEnd ? 'continued' : 'child', first: false, last: false });
+    runs.push(top.id);
+  }
+  // A run is consecutive lines painted by the same item: a nested callout
+  // interrupts its parent's run, which starts again after it.
+  for (let k = 0; k < out.length; k++) {
+    const p = out[k];
+    const prev = out[k - 1];
+    const next = out[k + 1];
+    p.first = !prev || prev.line !== p.line - 1 || runs[k - 1] !== runs[k];
+    p.last = !next || next.line !== p.line + 1 || runs[k + 1] !== runs[k];
+  }
+  return out;
+}
+
 export interface LineEdit {
   /** Offsets within the line. */
   from: number;
@@ -187,6 +333,46 @@ export function toHex(rgb: string): string {
   return '#' + parts.map((n) => n.toString(16).padStart(2, '0')).join('');
 }
 
+function channels(rgb: string): number[] {
+  return (toRgb(rgb) ?? '0, 0, 0').split(',').map((n) => Number(n.trim()));
+}
+
+/** WCAG contrast ratio of two `r, g, b` colours: 1 for equal ones, 21 for black on white. */
+export function contrastRatio(a: string, b: string): number {
+  const luminance = (rgb: string): number => {
+    const [r, g, bl] = channels(rgb).map((v) => {
+      const c = v / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** The colour a background `rgb` at `opacity` shows over `base`, as `r, g, b`. */
+export function effectiveBg(rgb: string, opacity: number, base: string): string {
+  const over = channels(rgb);
+  const under = channels(base);
+  return over.map((v, i) => Math.round(v * opacity + under[i] * (1 - opacity))).join(', ');
+}
+
+/** The theme backgrounds and the callout opacities the stylesheet uses, for the contrast warning. */
+export const CONTRAST_THEMES = {
+  light: { base: '255, 255, 255', opacity: 0.12 },
+  dark: { base: '30, 30, 30', opacity: 0.18 },
+} as const;
+
+/** Themes in which `textColor` on the callout's background is below 4.5:1. */
+export function lowContrastThemes(callout: Callout): Array<keyof typeof CONTRAST_THEMES> {
+  const text = callout.textColor;
+  if (!text) return [];
+  return (Object.keys(CONTRAST_THEMES) as Array<keyof typeof CONTRAST_THEMES>).filter((k) => {
+    const { base, opacity } = CONTRAST_THEMES[k];
+    return contrastRatio(text, effectiveBg(callout.color, opacity, base)) < 4.5;
+  });
+}
+
 /** Whether a character can start a callout: 1 to 3 characters, no spaces, not a list marker or `[`. */
 export function validChar(char: string): boolean {
   const n = Array.from(char).length;
@@ -207,11 +393,15 @@ export function readCallouts(stored: unknown): Callout[] | null {
   for (const item of stored as unknown[]) {
     if (typeof item !== 'object' || item === null) continue;
     const { char, color, icon, name } = item as Record<string, unknown>;
+    const extra = item as Record<string, unknown>;
     if (typeof char !== 'string' || !validChar(char) || seen.has(char)) continue;
     const rgb = typeof color === 'string' ? toRgb(color) : null;
     if (!rgb) continue;
     seen.add(char);
     const callout: Callout = { char, color: rgb };
+    const text = [extra.textColor, extra.textColour].find((v) => typeof v === 'string');
+    const textRgb = typeof text === 'string' ? toRgb(text) : null;
+    if (textRgb) callout.textColor = textRgb;
     if (typeof icon === 'string' && icon.trim() !== '') callout.icon = icon.trim();
     if (typeof name === 'string' && name.trim() !== '') callout.name = name.trim();
     else {
