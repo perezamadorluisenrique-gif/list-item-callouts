@@ -29,6 +29,8 @@ const ru: Messages = {
   // Settings
   'setting.colourContinuation.name': 'Раскрашивать перенесённые строки',
   'setting.colourContinuation.desc': 'Раскрашивает в редакторе строки, на которые переносится пункт, а не только его первую строку.',
+  'setting.colourChildren.name': "Окрашивать вложенные пункты",
+  'setting.colourChildren.desc': "Окрашивает в редакторе пункты, вложенные в выноску, её цветом. В режиме чтения они всегда остаются на фоне родителя, так Markdown вкладывает список. Требует «Раскрашивать перенесённые строки».",
   'setting.syntax.name': 'Как записать выносной блок',
   'setting.syntax.desc':
     'Начните пункт списка с одного из этих символов и пробела, как в "- & Buy milk". Значок, если он задан, показывается вместо символа; можно использовать любое имя значка Lucide, например "star" или "alert-triangle".',
@@ -44,6 +46,12 @@ const ru: Messages = {
   'setting.row.char': 'Символ',
   'setting.row.name': 'Название',
   'setting.row.icon': 'Значок',
+  'setting.row.background': "Фон",
+  'setting.row.text': "Цвет текста",
+  'setting.row.textReset': "Использовать цвет текста темы",
+  'setting.row.lowContrast.light': "Низкая контрастность в светлой теме",
+  'setting.row.lowContrast.dark': "Низкая контрастность в тёмной теме",
+  'setting.row.lowContrast.both': "Низкая контрастность в светлой и тёмной темах",
   'notice.imported.one': 'Из List Callouts импортирован 1 выносной блок.',
   'notice.imported.other': 'Из List Callouts импортировано выносных блоков: {count}.',
   'notice.noLegacy': 'В этом хранилище не найдено настроек List Callouts.',

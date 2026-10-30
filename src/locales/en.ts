@@ -34,6 +34,8 @@ const en = {
   // Settings
   'setting.colourContinuation.name': 'Colour wrapped lines',
   'setting.colourContinuation.desc': 'Colour the lines an item wraps onto in the editor, not just its first line.',
+  'setting.colourChildren.name': "Colour nested items",
+  'setting.colourChildren.desc': "Colour the items nested under a callout with its colour in the editor. Reading view always keeps them inside the parent's background, because that is how Markdown nests a list. Needs wrapped lines to be coloured too.",
   'setting.syntax.name': 'Writing a callout',
   'setting.syntax.desc':
     'Start a list item with one of these characters and a space, as in "- & Buy milk". An icon, if set, is shown in place of the character; use any Lucide icon name, such as "star" or "alert-triangle".',
@@ -49,6 +51,12 @@ const en = {
   'setting.row.char': 'Char',
   'setting.row.name': 'Name',
   'setting.row.icon': 'Icon',
+  'setting.row.background': "Background",
+  'setting.row.text': "Text colour",
+  'setting.row.textReset': "Use the theme's text colour",
+  'setting.row.lowContrast.light': "Low contrast in the light theme",
+  'setting.row.lowContrast.dark': "Low contrast in the dark theme",
+  'setting.row.lowContrast.both': "Low contrast in the light and dark themes",
   'notice.imported.one': 'Imported 1 callout from List Callouts.',
   'notice.imported.other': 'Imported {count} callouts from List Callouts.',
   'notice.noLegacy': 'No List Callouts settings were found in this vault.',

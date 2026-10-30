@@ -4,6 +4,12 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## 0.4.0
+
+- Items nested under a callout now take its colour in the editor (Live Preview and source mode), as they already did in Reading view; a nested callout keeps its own colour. The new **Colour nested items** setting turns it off.
+- Each callout can have a text colour besides its background, with a warning when the contrast is low in the light or dark theme.
+- A child item whose callout is far above the viewport in a long note is now coloured.
+
 ## 0.3.2
 
 - On a phone, **Open the callout overview** now shows the overview. The sidebar drawer used to open on whichever tab it showed last, such as Backlinks.

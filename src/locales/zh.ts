@@ -29,6 +29,8 @@ const zh: Messages = {
   // Settings
   'setting.colourContinuation.name': '为折行着色',
   'setting.colourContinuation.desc': '在编辑器中，不仅为列表项的第一行着色，也为它折到的后续行着色。',
+  'setting.colourChildren.name': "为嵌套项着色",
+  'setting.colourChildren.desc': "在编辑器中用标注的颜色为其下嵌套的项着色。阅读视图始终把它们放在父项的背景内，因为 Markdown 就是这样嵌套列表的。需要开启“为折行着色”。",
   'setting.syntax.name': '如何书写标注',
   'setting.syntax.desc':
     '列表项以这些字符之一加一个空格开头，例如 "- & Buy milk"。若设置了图标，则用图标代替该字符显示；可使用任何 Lucide 图标名称，例如 "star" 或 "alert-triangle"。',
@@ -43,6 +45,12 @@ const zh: Messages = {
   'setting.row.char': '字符',
   'setting.row.name': '名称',
   'setting.row.icon': '图标',
+  'setting.row.background': "背景",
+  'setting.row.text': "文字颜色",
+  'setting.row.textReset': "使用主题文字颜色",
+  'setting.row.lowContrast.light': "浅色主题下对比度偏低",
+  'setting.row.lowContrast.dark': "深色主题下对比度偏低",
+  'setting.row.lowContrast.both': "浅色和深色主题下对比度偏低",
   'notice.imported.one': '已从 List Callouts 导入 1 个标注。',
   'notice.imported.other': '已从 List Callouts 导入 {count} 个标注。',
   'notice.noLegacy': '在此仓库中没有找到 List Callouts 的设置。',

@@ -4,8 +4,14 @@ import test from 'node:test';
 import {
   DEFAULT_CALLOUTS,
   calloutAt,
+  blockOwner,
   calloutAtText,
   continuationLines,
+  contrastRatio,
+  effectiveBg,
+  itemBlock,
+  lowContrastThemes,
+  paintPlan,
   listItem,
   nextCallout,
   readCallouts,
@@ -119,4 +125,89 @@ test('reads List Callouts settings and its own', () => {
 test('listItem', () => {
   assert.deepEqual(listItem('  - [ ] x'), { indent: '  ', textStart: 8 });
   assert.equal(listItem('text'), null);
+});
+
+const TREE = ['- ! Parent', '  - child', '    - grandchild', '  - ? own colour', '    - its child', '  - back to parent', '- sibling'];
+
+test('itemBlock covers children and grandchildren and stops at a sibling', () => {
+  assert.equal(itemBlock(TREE, 0), 5);
+  assert.equal(itemBlock(TREE, 1), 1);
+  assert.equal(itemBlock(TREE, 3), 1);
+  assert.equal(itemBlock(TREE, 6), 0);
+});
+
+test('itemBlock: blank lines, headings and lazy continuation', () => {
+  assert.equal(itemBlock(['- & a', '', '  - b', '- c'], 0), 2);
+  assert.equal(itemBlock(['- & a', '', '', '  - b'], 0), 0);
+  assert.equal(itemBlock(['- & a', '', '- b'], 0), 0);
+  assert.equal(itemBlock(['- & a', '  - b', '## Heading', '  - c'], 0), 1);
+  assert.equal(itemBlock(['- & a', 'lazy', '  - b'], 0), 2);
+  assert.equal(itemBlock(['- & a', '---', '  - b'], 0), 0);
+  assert.equal(itemBlock(['- & a'], 0), 0);
+});
+
+test('itemBlock: tabs count as tabSize columns, ordered parents work', () => {
+  assert.equal(itemBlock(['- & a', '\t- b', '- c'], 0, 4), 1);
+  assert.equal(itemBlock(['  - & a', '\t- b'], 0, 4), 1);
+  assert.equal(itemBlock(['1. & a', '   - b', '2. c'], 0), 1);
+});
+
+test('blockOwner finds the outermost item', () => {
+  assert.equal(blockOwner(TREE, 2), 0);
+  assert.equal(blockOwner(TREE, 4), 0);
+  assert.equal(blockOwner(TREE, 0), null);
+  assert.equal(blockOwner(['text', '', 'more text'], 2), null);
+  assert.equal(blockOwner(['- a', '## H', '  - b'], 2), null);
+  const deep = ['- ! top', ...Array.from({ length: 50 }, () => '  - x')];
+  assert.equal(blockOwner(deep, 50), 0);
+  assert.equal(blockOwner(deep, 50, 4, 10), null);
+});
+
+test('paintPlan colours children, a nested callout keeps its own colour', () => {
+  const plan = paintPlan(TREE, C, { colourContinuation: true, colourChildren: true });
+  assert.deepEqual(
+    plan.map((p) => `${p.line}${p.callout.char}${p.role[0]}`),
+    ['0!f', '1!c', '2!c', '3?f', '4?c', '5!c'],
+  );
+  assert.deepEqual(plan.map((p) => `${+p.first}${+p.last}`), ['10', '00', '01', '10', '01', '11']);
+});
+
+test('paintPlan with colourChildren off paints the item and its wrapped lines only', () => {
+  const lines = ['- & a', 'wrapped', '  - child', '- b'];
+  const plan = paintPlan(lines, C, { colourContinuation: true, colourChildren: false });
+  assert.deepEqual(plan.map((p) => [p.line, p.role]), [[0, 'first'], [1, 'continued']]);
+  const off = paintPlan(lines, C, { colourContinuation: false, colourChildren: true });
+  assert.deepEqual(off.map((p) => p.line), [0]);
+});
+
+test('paintPlan skips callouts inside code and carries the text colour', () => {
+  const callouts = [{ char: '&', color: '255, 0, 0', textColor: '1, 2, 3' }];
+  const plan = paintPlan(['- & a', '  - b'], callouts, { colourContinuation: true, colourChildren: true });
+  assert.equal(plan[1].callout.textColor, '1, 2, 3');
+  const code = paintPlan(['- & a'], callouts, { colourContinuation: true, colourChildren: true, isCode: () => true });
+  assert.equal(code.length, 0);
+});
+
+test('readCallouts keeps a valid text colour and drops an invalid one', () => {
+  const read = readCallouts([
+    { char: '&', color: '255, 214, 0', textColor: '#c80000' },
+    { char: '?', color: '255, 145, 0', textColour: 'rgb(1, 2, 3)' },
+    { char: '!', color: '255, 23, 68', textColor: 'blue' },
+    { char: '~', color: '124, 77, 255' },
+  ]);
+  assert.equal(read?.[0].textColor, '200, 0, 0');
+  assert.equal(read?.[1].textColor, '1, 2, 3');
+  assert.equal(read?.[2].char, '!');
+  assert.equal('textColor' in (read?.[2] ?? {}), false);
+  assert.equal('textColor' in (read?.[3] ?? {}), false);
+});
+
+test('contrastRatio, effectiveBg and the low-contrast warning', () => {
+  assert.equal(contrastRatio('0, 0, 0', '255, 255, 255'), 21);
+  assert.equal(contrastRatio('9, 9, 9', '9, 9, 9'), 1);
+  assert.equal(effectiveBg('255, 0, 0', 0.5, '255, 255, 255'), '255, 128, 128');
+  assert.deepEqual(lowContrastThemes({ char: '&', color: '255, 214, 0' }), []);
+  assert.deepEqual(lowContrastThemes({ char: '&', color: '255, 214, 0', textColor: '255, 255, 255' }), ['light']);
+  assert.deepEqual(lowContrastThemes({ char: '&', color: '255, 214, 0', textColor: '255, 255, 0' }).includes('light'), true);
+  assert.deepEqual(lowContrastThemes({ char: '&', color: '255, 214, 0', textColor: '0, 0, 0' }), ['dark']);
 });

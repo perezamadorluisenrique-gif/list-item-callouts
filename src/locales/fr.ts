@@ -29,6 +29,8 @@ const fr: Messages = {
   // Settings
   'setting.colourContinuation.name': 'Colorer les lignes coupées',
   'setting.colourContinuation.desc': 'Colore dans l’éditeur les lignes sur lesquelles un élément se prolonge, pas seulement sa première ligne.',
+  'setting.colourChildren.name': "Colorer les éléments imbriqués",
+  'setting.colourChildren.desc': "Colore dans l'éditeur les éléments imbriqués sous un callout avec sa couleur. La vue de lecture les garde toujours dans le fond du parent, car c'est ainsi que Markdown imbrique une liste. Nécessite « Colorer les lignes coupées ».",
   'setting.syntax.name': 'Écrire une mise en avant',
   'setting.syntax.desc':
     'Commencez un élément de liste par l’un de ces caractères suivi d’une espace, comme dans "- & Buy milk". Une icône, si elle est définie, s’affiche à la place du caractère ; utilisez n’importe quel nom d’icône Lucide, comme "star" ou "alert-triangle".',
@@ -44,6 +46,12 @@ const fr: Messages = {
   'setting.row.char': 'Caractère',
   'setting.row.name': 'Nom',
   'setting.row.icon': 'Icône',
+  'setting.row.background': "Arrière-plan",
+  'setting.row.text': "Couleur du texte",
+  'setting.row.textReset': "Utiliser la couleur de texte du thème",
+  'setting.row.lowContrast.light': "Contraste faible dans le thème clair",
+  'setting.row.lowContrast.dark': "Contraste faible dans le thème sombre",
+  'setting.row.lowContrast.both': "Contraste faible dans les thèmes clair et sombre",
   'notice.imported.one': '1 mise en avant importée depuis List Callouts.',
   'notice.imported.other': '{count} mises en avant importées depuis List Callouts.',
   'notice.noLegacy': 'Aucun réglage de List Callouts n’a été trouvé dans ce coffre.',

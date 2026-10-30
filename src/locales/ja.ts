@@ -29,6 +29,8 @@ const ja: Messages = {
   // Settings
   'setting.colourContinuation.name': '折り返し行にも色を付ける',
   'setting.colourContinuation.desc': 'エディタで、項目の最初の行だけでなく、折り返された行にも色を付けます。',
+  'setting.colourChildren.name': "ネストした項目に色を付ける",
+  'setting.colourChildren.desc': "コールアウトの下にネストした項目を、エディタでそのコールアウトの色にします。リーディングビューでは、Markdown のリストの入れ子どおり、常に親の背景の中に入ります。「折り返し行にも色を付ける」が必要です。",
   'setting.syntax.name': 'コールアウトの書き方',
   'setting.syntax.desc':
     'リスト項目を、これらの文字のいずれかとスペースで始めます（例: "- & Buy milk"）。アイコンを設定すると、文字の代わりに表示されます。"star" や "alert-triangle" など、Lucide の任意のアイコン名を使えます。',
@@ -43,6 +45,12 @@ const ja: Messages = {
   'setting.row.char': '文字',
   'setting.row.name': '名前',
   'setting.row.icon': 'アイコン',
+  'setting.row.background': "背景",
+  'setting.row.text': "文字色",
+  'setting.row.textReset': "テーマの文字色を使う",
+  'setting.row.lowContrast.light': "ライトテーマでコントラストが低い",
+  'setting.row.lowContrast.dark': "ダークテーマでコントラストが低い",
+  'setting.row.lowContrast.both': "ライトテーマとダークテーマでコントラストが低い",
   'notice.imported.one': 'List Callouts から 1 件のコールアウトをインポートしました。',
   'notice.imported.other': 'List Callouts から {count} 件のコールアウトをインポートしました。',
   'notice.noLegacy': 'この保管庫に List Callouts の設定は見つかりませんでした。',

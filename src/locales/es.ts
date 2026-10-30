@@ -29,6 +29,8 @@ const es: Messages = {
   // Settings
   'setting.colourContinuation.name': 'Colorear las líneas partidas',
   'setting.colourContinuation.desc': 'Colorea en el editor las líneas a las que se extiende un elemento, no solo su primera línea.',
+  'setting.colourChildren.name': "Colorear elementos anidados",
+  'setting.colourChildren.desc': "Colorea en el editor los elementos anidados bajo un callout con su color. La vista de lectura siempre los deja dentro del fondo del padre, porque así anida Markdown una lista. Requiere «Colorear las líneas partidas».",
   'setting.syntax.name': 'Cómo escribir un destacado',
   'setting.syntax.desc':
     'Empieza un elemento de lista con uno de estos caracteres y un espacio, como en "- & Buy milk". Si se define un icono, se muestra en lugar del carácter; usa cualquier nombre de icono de Lucide, como "star" o "alert-triangle".',
@@ -44,6 +46,12 @@ const es: Messages = {
   'setting.row.char': 'Carácter',
   'setting.row.name': 'Nombre',
   'setting.row.icon': 'Icono',
+  'setting.row.background': "Fondo",
+  'setting.row.text': "Color del texto",
+  'setting.row.textReset': "Usar el color de texto del tema",
+  'setting.row.lowContrast.light': "Contraste bajo en el tema claro",
+  'setting.row.lowContrast.dark': "Contraste bajo en el tema oscuro",
+  'setting.row.lowContrast.both': "Contraste bajo en los temas claro y oscuro",
   'notice.imported.one': 'Se importó 1 destacado desde List Callouts.',
   'notice.imported.other': 'Se importaron {count} destacados desde List Callouts.',
   'notice.noLegacy': 'No se encontraron ajustes de List Callouts en esta bóveda.',

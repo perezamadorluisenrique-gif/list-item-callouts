@@ -29,6 +29,8 @@ const ko: Messages = {
   // Settings
   'setting.colourContinuation.name': '줄바꿈된 줄에도 색 입히기',
   'setting.colourContinuation.desc': '편집기에서 항목의 첫 줄만이 아니라 항목이 이어지는 줄에도 색을 입힙니다.',
+  'setting.colourChildren.name': "중첩 항목 색칠",
+  'setting.colourChildren.desc': "편집기에서 콜아웃 아래에 중첩된 항목을 해당 콜아웃의 색으로 칠합니다. 읽기 보기에서는 Markdown이 목록을 중첩하는 방식대로 항상 부모 배경 안에 들어갑니다. \"줄바꿈된 줄에도 색 입히기\"이 필요합니다.",
   'setting.syntax.name': '콜아웃 쓰는 법',
   'setting.syntax.desc':
     '목록 항목을 이 문자 중 하나와 공백으로 시작합니다(예: "- & Buy milk"). 아이콘을 설정하면 문자 대신 표시됩니다. "star"나 "alert-triangle" 같은 Lucide 아이콘 이름을 쓸 수 있습니다.',
@@ -43,6 +45,12 @@ const ko: Messages = {
   'setting.row.char': '문자',
   'setting.row.name': '이름',
   'setting.row.icon': '아이콘',
+  'setting.row.background': "배경",
+  'setting.row.text': "글자색",
+  'setting.row.textReset': "테마 글자색 사용",
+  'setting.row.lowContrast.light': "밝은 테마에서 대비가 낮음",
+  'setting.row.lowContrast.dark': "어두운 테마에서 대비가 낮음",
+  'setting.row.lowContrast.both': "밝은 테마와 어두운 테마에서 대비가 낮음",
   'notice.imported.one': 'List Callouts에서 콜아웃 1개를 가져왔습니다.',
   'notice.imported.other': 'List Callouts에서 콜아웃 {count}개를 가져왔습니다.',
   'notice.noLegacy': '이 보관함에서 List Callouts 설정을 찾지 못했습니다.',

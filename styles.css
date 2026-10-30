@@ -3,6 +3,8 @@
 body {
   --lic-bg-opacity: 0.12;
   --lic-radius: var(--radius-s, 4px);
+  /* Nested items in the editor; Reading view paints them with the parent's own background. */
+  --lic-child-opacity: var(--lic-bg-opacity);
 }
 
 .theme-dark {
@@ -22,6 +24,23 @@ body {
 .markdown-source-view .cm-line.lic-last {
   border-bottom-left-radius: var(--lic-radius);
   border-bottom-right-radius: var(--lic-radius);
+}
+
+/* Items nested under a callout, in the editor. */
+.markdown-source-view .cm-line.lic-callout.lic-child {
+  background-color: rgba(var(--lic-color), var(--lic-child-opacity));
+}
+
+/* A callout's own text colour; links, tags and inline code keep theirs. */
+.cm-line.lic-has-text,
+li.lic-has-text,
+.lic-ov-item.lic-has-text {
+  color: rgb(var(--lic-text));
+}
+
+/* A nested callout without a text colour does not inherit its parent's. */
+li.lic-has-text li.lic-callout:not(.lic-has-text) {
+  color: var(--text-normal);
 }
 
 /* Reading view: the whole item, nested items included. */
