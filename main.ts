@@ -42,6 +42,7 @@ import {
 } from './src/callouts.ts';
 import type { Callout } from './src/callouts.ts';
 import { t } from './src/i18n.ts';
+import { moreText, openMore } from './src/more-link.ts';
 import { extractCallouts, groupByCallout, plainText, truncate } from './src/overview.ts';
 import type { FoundCallout } from './src/overview.ts';
 
@@ -695,6 +696,7 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
       },
       { ...SETTING_TEXT.restore, action: () => this.restoreDefaults() },
       { ...SETTING_TEXT.legacy, action: () => void this.importLegacy() },
+      { name: moreText().name, desc: moreText().desc, action: () => openMore() },
     ];
   }
 
@@ -757,6 +759,11 @@ class ListItemCalloutsSettingTab extends PluginSettingTab {
       .setName(SETTING_TEXT.legacy.name)
       .setDesc(SETTING_TEXT.legacy.desc)
       .addButton((button) => button.setButtonText(t('setting.legacy.button')).onClick(() => void this.importLegacy()));
+
+    new Setting(containerEl)
+      .setName(moreText().name)
+      .setDesc(moreText().desc)
+      .addButton((b) => b.setButtonText(moreText().button).onClick(() => openMore()));
   }
 
   /** One callout's row: character, name, icon and colour. */
